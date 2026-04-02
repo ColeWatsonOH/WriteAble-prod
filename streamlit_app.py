@@ -651,7 +651,7 @@ if main_page == "Main App":
 
         col_a, col_b, col_c = st.columns(3)
         col_a.metric("Check types", "12", "Grammar, Readability, Accessibility")
-        col_b.metric("Max file size", "30 MB", "PDF, DOCX, TXT")
+        col_b.metric("Max file size", "20 MB", "PDF, DOCX, TXT")
         col_c.metric("AI fix model", "Claude Haiku", "Fast & accurate")
 
         st.markdown("---")
@@ -794,7 +794,7 @@ elif main_page == "Guides & About":
         | PDF (.pdf) | ✅ Requires `pdfplumber` |
         | Pasted text | ✅ Always available |
 
-        Maximum recommended file size: **30 MB**.
+        Maximum recommended file size: **20 MB**.
 
         ---
 
