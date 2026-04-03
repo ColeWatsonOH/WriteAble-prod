@@ -160,6 +160,8 @@ def _word_count(text: str) -> int:
 def _sentences(text: str) -> List[str]:
     return [s.strip() for s in re.split(r'(?<=[.!?])\s+', text) if s.strip()]
 
+def go_to(page_name: str):
+    st.query_params["page"] = page_name
 
 def run_checks(text: str) -> List[Issue]:
     issues: List[Issue] = []
@@ -586,16 +588,32 @@ def render_report(issues: List[Issue], text: str, api_key: Optional[str]):
 # ════════════════════════════════════════════════════════════════════════════════
 logo_path = Path("logo.png")
 if logo_path.exists():
-    st.sidebar.image(str(logo_path), use_container_width=True)
+    st.sidebar.markdown(
+        f"""
+        <a href="/" target="_self" style="text-decoration: none;">
+            <img src="data:image/png;base64,{logo_path.read_bytes().encode('base64').decode()}" 
+                 style="width:100%; border-radius:10px; margin-bottom:10px;">
+        </a>
+        """,
+        unsafe_allow_html=True
+    )
 else:
     st.sidebar.markdown("## 📝 WriteAble")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("## Navigation")
-page = st.sidebar.selectbox(
-    "Choose a section:",
-    ["Overview", "Upload & Analyze", "Analysis Results", "Quick Guide", "Full Guide", "About"]
+current_page = st.query_params.get("page", "main")
+main_page = st.sidebar.radio(
+    "Go to:",
+    ["Main App", "Guides & About"],
+    index=0 if current_page == "main" else 1,
+    label_visibility="collapsed"
 )
+
+if main_page == "Main App":
+    st.query_params["page"] = "main"
+else:
+    st.query_params["page"] = "guides"
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("## 🤖 AI Fix Settings")
@@ -619,245 +637,234 @@ st.sidebar.markdown(f"{'✅' if HAS_PDF else '⚠'} PDF support ({'pdfplumber' i
 # PAGES
 # ════════════════════════════════════════════════════════════════════════════════
 
-# ── OVERVIEW ──────────────────────────────────────────────────────────────────
-if page == "Overview":
-    st.title("WriteAble – Accessible Document Helper")
-    st.markdown("""
-    WriteAble analyzes documents for **accessibility, readability, and grammar issues**
-    and provides plain-language explanations and AI-powered fix suggestions.
-    """)
 
-    col_a, col_b, col_c = st.columns(3)
-    col_a.metric("Check types", "12", "Grammar, Readability, Accessibility")
-    col_b.metric("Max file size", "30 MB", "PDF, DOCX, TXT")
-    col_c.metric("AI fix model", "Claude Haiku", "Fast & accurate")
-
-    st.markdown("---")
-    st.markdown("### What WriteAble checks")
-
-    r1c1, r1c2, r1c3 = st.columns(3)
-    with r1c1:
-        st.markdown("**📝 Grammar**")
-        st.markdown("- Spelling mistakes\n- Repeated words\n- Extra spaces")
-    with r1c2:
-        st.markdown("**📖 Readability**")
-        st.markdown("- Long sentences\n- Flesch Reading Ease\n- Grade level\n- Passive voice")
-    with r1c3:
-        st.markdown("**♿ Accessibility**")
-        st.markdown("- Non-inclusive language\n- Undefined acronyms\n- Missing headings\n- ALL CAPS overuse\n- Bare URLs")
-
-    st.markdown("---")
-    st.info("👉 Go to **Upload & Analyze** in the sidebar to get started.")
+# ── Main App ──────────────────────────────────────────────────────────────────
+if main_page == "Main App":
 
 
-# ── UPLOAD & ANALYZE ──────────────────────────────────────────────────────────
-elif page == "Upload & Analyze":
-    st.title("Upload or Paste Your Document")
+    # ── OVERVIEW ──
+        st.title("WriteAble – Accessible Document Helper")
+        st.markdown("""
+        WriteAble analyzes documents for **accessibility, readability, and grammar issues**
+        and provides plain-language explanations and AI-powered fix suggestions.
+        """)
 
-    col1, col2 = st.columns(2)
+        col_a, col_b, col_c = st.columns(3)
+        col_a.metric("Check types", "12", "Grammar, Readability, Accessibility")
+        col_b.metric("Max file size", "20 MB", "PDF, DOCX, TXT")
+        col_c.metric("AI fix model", "Claude Haiku", "Fast & accurate")
 
-    with col1:
-        st.subheader("📁 Upload a file")
-        uploaded = st.file_uploader(
-            "Choose a file (TXT, DOCX, or PDF)",
-            type=["txt", "docx", "pdf"],
-            help="Files are processed locally and never stored."
-        )
-        if uploaded:
-            st.info(f"File loaded: **{uploaded.name}** ({uploaded.size / 1024:.1f} KB)")
+        st.markdown("---")
+        
+    # ── UPLOAD ──
+        st.title("Upload or Paste Your Document")
 
-    with col2:
-        st.subheader("✏ Paste text")
-        pasted = st.text_area(
-            "Paste your document text here:",
-            height=220,
-            placeholder="Paste any document text here…",
-            help="Paste plain text, Markdown, or any document copy."
-        )
+        col1, col2 = st.columns(2)
 
-    st.markdown("---")
+        with col1:
+            st.subheader("📁 Upload a file")
+            uploaded = st.file_uploader(
+                "Choose a file (TXT, DOCX, or PDF)",
+                type=["txt", "docx", "pdf"],
+                help="Files are processed locally and never stored."
+            )
+            if uploaded:
+                st.info(f"File loaded: **{uploaded.name}** ({uploaded.size / 1024:.1f} KB)")
 
-    if st.button("🔍 Run Accessibility Check", type="primary"):
-        # Determine text source
-        text = None
-        source_label = ""
+        with col2:
+            st.subheader("✏ Paste text")
+            pasted = st.text_area(
+                "Paste your document text here:",
+                height=220,
+                placeholder="Paste any document text here…",
+                help="Paste plain text, Markdown, or any document copy."
+            )
 
-        if uploaded:
-            with st.spinner("Reading file…"):
-                text = extract_text(uploaded)
-                source_label = uploaded.name
-        elif pasted and pasted.strip():
-            text = pasted.strip()
-            source_label = "pasted text"
-        else:
-            st.warning("Please upload a file or paste some text first.")
-
-        if text and text.strip():
-            if len(text.strip()) < 20:
-                st.warning("Text is too short to analyze (need at least 20 characters).")
-            else:
-                with st.spinner("Running accessibility checks…"):
-                    issues = run_checks(text)
-
-                # Store in session state
-                st.session_state["analysis_text"]   = text
-                st.session_state["analysis_issues"]  = issues
-                st.session_state["analysis_source"]  = source_label
-                # Clear previous fix state
-                for key in [k for k in st.session_state if k.startswith(("fix_", "acc_", "dis_"))]:
-                    del st.session_state[key]
-
-                st.success(f"✅ Analysis complete: **{len(issues)} issue(s)** found in {source_label}")
-
-                # Mini preview
-                errors   = sum(1 for i in issues if i.severity == "error")
-                warnings = sum(1 for i in issues if i.severity == "warning")
-                infos    = sum(1 for i in issues if i.severity == "info")
-                pc1, pc2, pc3 = st.columns(3)
-                pc1.metric("🔴 Errors",     errors)
-                pc2.metric("🟡 Warnings",   warnings)
-                pc3.metric("🔵 Suggestions", infos)
-
-                st.info("👉 Go to **Analysis Results** in the sidebar to view the full interactive report.")
-
-
-# ── ANALYSIS RESULTS ──────────────────────────────────────────────────────────
-elif page == "Analysis Results":
-    st.title("Analysis Results")
-
-    if "analysis_issues" not in st.session_state:
-        st.info("No analysis has been run yet. Go to **Upload & Analyze** first.")
-    else:
-        issues = st.session_state["analysis_issues"]
-        text   = st.session_state["analysis_text"]
-        source = st.session_state.get("analysis_source", "document")
-
-        st.markdown(f"**Source:** {source} &nbsp;|&nbsp; **{len(text.split())} words** &nbsp;|&nbsp; **{len(issues)} issue(s) found**")
         st.markdown("---")
 
-        render_report(issues, text, api_key)
+        if st.button("🔍 Run Accessibility Check", type="primary"):
+            # Determine text source
+            text = None
+            source_label = ""
+
+            if uploaded:
+                with st.spinner("Reading file…"):
+                    text = extract_text(uploaded)
+                    source_label = uploaded.name
+            elif pasted and pasted.strip():
+                text = pasted.strip()
+                source_label = "pasted text"
+            else:
+                st.warning("Please upload a file or paste some text first.")
+
+            if text and text.strip():
+                if len(text.strip()) < 20:
+                    st.warning("Text is too short to analyze (need at least 20 characters).")
+                else:
+                    with st.spinner("Running accessibility checks…"):
+                        issues = run_checks(text)
+
+                    # Store in session state
+                    st.session_state["analysis_text"]   = text
+                    st.session_state["analysis_issues"]  = issues
+                    st.session_state["analysis_source"]  = source_label
+                    # Clear previous fix state
+                    for key in [k for k in st.session_state if k.startswith(("fix_", "acc_", "dis_"))]:
+                        del st.session_state[key]
+
+                    st.success(f"✅ Analysis complete: **{len(issues)} issue(s)** found in {source_label}")
+
+                    # Mini preview
+                    errors   = sum(1 for i in issues if i.severity == "error")
+                    warnings = sum(1 for i in issues if i.severity == "warning")
+                    infos    = sum(1 for i in issues if i.severity == "info")
+                    pc1, pc2, pc3 = st.columns(3)
+                    pc1.metric("🔴 Errors",     errors)
+                    pc2.metric("🟡 Warnings",   warnings)
+                    pc3.metric("🔵 Suggestions", infos)
+
+                    
+        st.markdown("---")
+    # ── RESULTS ──
+        st.title("Analysis Results")
+
+        if "analysis_issues" not in st.session_state:
+            st.info("No analysis has been run yet. Go to **Upload & Analyze** first.")
+        else:
+            issues = st.session_state["analysis_issues"]
+            text   = st.session_state["analysis_text"]
+            source = st.session_state.get("analysis_source", "document")
+
+            st.markdown(f"**Source:** {source} &nbsp;|&nbsp; **{len(text.split())} words** &nbsp;|&nbsp; **{len(issues)} issue(s) found**")
+            st.markdown("---")
+
+            render_report(issues, text, api_key)
 
 
-# ── QUICK GUIDE ───────────────────────────────────────────────────────────────
-elif page == "Quick Guide":
-    st.title("Quick User Guide")
-    st.markdown("""
-    **1. Upload & Analyze**
-    Go to *Upload & Analyze* in the sidebar. Upload a TXT/DOCX/PDF file or paste text directly,
-    then click **Run Accessibility Check**.
+# ── Guides & About ───────────────────────────────────────────────────────────────
+elif main_page == "Guides & About":
 
-    **2. View Results**
-    Navigate to *Analysis Results*. You'll see a summary dashboard showing Errors, Warnings, and Suggestions.
+    tab1, tab2, tab3 = st.tabs([
+        "⚡ Quick Guide",
+        "📘 Full Guide",
+        "ℹ️ About"
+    ])
 
-    **3. Browse issues by tab**
-    Issues are grouped into three tabs: **Grammar**, **Readability**, and **Accessibility**.
-    Use the *All Issues* tab to see everything at once.
+    with tab1:
+        st.title("Quick User Guide")
+        st.markdown("""
+        **1. Upload & Analyze**
+        Go to *Upload & Analyze* in the sidebar. Upload a TXT/DOCX/PDF file or paste text directly,
+        then click **Run Accessibility Check**.
 
-    **4. Filter & search**
-    Use the filter panel to narrow by category or severity, or search for specific keywords.
+        **2. View Results**
+        Navigate to *Analysis Results*. You'll see a summary dashboard showing Errors, Warnings, and Suggestions.
 
-    **5. Expand an issue**
-    Click any issue row to expand it. You'll see:
-    - A plain-English explanation of the problem
-    - The problematic text snippet
-    - A quick suggested replacement (where applicable)
+        **3. Browse issues by tab**
+        Issues are grouped into three tabs: **Grammar**, **Readability**, and **Accessibility**.
+        Use the *All Issues* tab to see everything at once.
 
-    **6. Get an AI Fix**
-    Add your Anthropic API key in the sidebar, then click **🤖 Get AI Fix** on any issue.
-    Review the suggestion and click **✅ Accept this fix** to log it.
+        **4. Filter & search**
+        Use the filter panel to narrow by category or severity, or search for specific keywords.
 
-    **7. Export**
-    Scroll to the bottom of the report to download the original text or a **Fixes Report**
-    summarizing every fix you accepted.
-    """)
+        **5. Expand an issue**
+        Click any issue row to expand it. You'll see:
+        - A plain-English explanation of the problem
+        - The problematic text snippet
+        - A quick suggested replacement (where applicable)
 
+        **6. Get an AI Fix**
+        Add your Anthropic API key in the sidebar, then click **🤖 Get AI Fix** on any issue.
+        Review the suggestion and click **✅ Accept this fix** to log it.
 
-# ── FULL GUIDE ────────────────────────────────────────────────────────────────
-elif page == "Full Guide":
-    st.title("Full User Guide")
-    st.markdown("""
-    ### Supported Input
+        **7. Export**
+        Scroll to the bottom of the report to download the original text or a **Fixes Report**
+        summarizing every fix you accepted.
+        """)
 
-    | Format | Support |
-    |--------|---------|
-    | Plain text (.txt) | ✅ Full support |
-    | Word document (.docx) | ✅ Requires `python-docx` |
-    | PDF (.pdf) | ✅ Requires `pdfplumber` |
-    | Pasted text | ✅ Always available |
+    with tab2:
+        st.title("Full User Guide")
+        st.markdown("""
+        ### Supported Input
 
-    Maximum recommended file size: **30 MB**.
+        | Format | Support |
+        |--------|---------|
+        | Plain text (.txt) | ✅ Full support |
+        | Word document (.docx) | ✅ Requires `python-docx` |
+        | PDF (.pdf) | ✅ Requires `pdfplumber` |
+        | Pasted text | ✅ Always available |
 
-    ---
+        Maximum recommended file size: **20 MB**.
 
-    ### What Each Check Does
+        ---
 
-    **Grammar**
-    - *Spelling* — Flags words that may be misspelled and suggests corrections. Proper nouns and
-      capitalised words are skipped to reduce false positives.
-    - *Repeated words* — Detects unintentional double words (e.g. "the the").
-    - *Extra spaces* — Flags multiple consecutive spaces.
+        ### What Each Check Does
 
-    **Readability**
-    - *Sentence length* — Flags sentences over 25 words (warning) or 35 words (error).
-    - *Flesch Reading Ease* — A 0–100 score: 60+ is suitable for general audiences.
-    - *Flesch-Kincaid Grade Level* — U.S. school grade equivalent; aim for Grade 8 or below.
-    - *Passive voice* — Flags documents with more than 4 passive constructions.
+        **Grammar**
+        - *Spelling* — Flags words that may be misspelled and suggests corrections. Proper nouns and
+        capitalised words are skipped to reduce false positives.
+        - *Repeated words* — Detects unintentional double words (e.g. "the the").
+        - *Extra spaces* — Flags multiple consecutive spaces.
 
-    **Accessibility**
-    - *Inclusive language* — Flags 20+ patterns of non-inclusive phrasing and suggests alternatives.
-    - *ALL CAPS overuse* — Flags documents with more than 3 all-caps words (excluding defined acronyms).
-    - *Undefined acronyms* — Flags acronyms that never appear in parenthetical definitions.
-    - *Missing headings* — Warns when documents over 200 words have no heading structure.
-    - *Bare URLs* — Flags URLs used as raw link text (inaccessible to screen readers).
+        **Readability**
+        - *Sentence length* — Flags sentences over 25 words (warning) or 35 words (error).
+        - *Flesch Reading Ease* — A 0–100 score: 60+ is suitable for general audiences.
+        - *Flesch-Kincaid Grade Level* — U.S. school grade equivalent; aim for Grade 8 or below.
+        - *Passive voice* — Flags documents with more than 4 passive constructions.
 
-    ---
+        **Accessibility**
+        - *Inclusive language* — Flags 20+ patterns of non-inclusive phrasing and suggests alternatives.
+        - *ALL CAPS overuse* — Flags documents with more than 3 all-caps words (excluding defined acronyms).
+        - *Undefined acronyms* — Flags acronyms that never appear in parenthetical definitions.
+        - *Missing headings* — Warns when documents over 200 words have no heading structure.
+        - *Bare URLs* — Flags URLs used as raw link text (inaccessible to screen readers).
 
-    ### AI Fix Feature
+        ---
 
-    Each issue has a **🤖 Get AI Fix** button. This calls **Claude Haiku** to generate a specific,
-    context-aware correction. You can:
-    - **Accept** the fix → it's logged in the Fixes Report
-    - **Dismiss** the issue → it's hidden from the report
+        ### AI Fix Feature
 
-    Your API key is used only for the current session and is never stored.
+        Each issue has a **🤖 Get AI Fix** button. This calls **Claude Haiku** to generate a specific,
+        context-aware correction. You can:
+        - **Accept** the fix → it's logged in the Fixes Report
+        - **Dismiss** the issue → it's hidden from the report
 
-    ---
+        Your API key is used only for the current session and is never stored.
 
-    ### Exporting
+        ---
 
-    - **Download original text** — Your source document as plain text.
-    - **Download fixes report** — A structured summary of every fix you accepted, showing the original
-      snippet alongside the corrected version.
+        ### Exporting
 
-    ---
+        - **Download original text** — Your source document as plain text.
+        - **Download fixes report** — A structured summary of every fix you accepted, showing the original
+        snippet alongside the corrected version.
 
-    ### Accessibility of WriteAble Itself
+        ---
 
-    - High-contrast badges and colour-coded severity
-    - Keyboard-navigable interface via Streamlit
-    - Plain-language explanations for every issue
-    - No animations or auto-playing media
-    """)
+        ### Accessibility of WriteAble Itself
 
+        - High-contrast badges and colour-coded severity
+        - Keyboard-navigable interface via Streamlit
+        - Plain-language explanations for every issue
+        - No animations or auto-playing media
+        """)
 
-# ── ABOUT ────────────────────────────────────────────────────────────────────
-elif page == "About":
-    st.title("About WriteAble")
-    st.markdown("""
-    WriteAble helps writers, content creators, and teams produce documents that are clearer,
-    more inclusive, and accessible to all readers — including people who use assistive technology.
+    with tab3:
+        st.title("About WriteAble")
+        st.markdown("""
+        WriteAble helps writers, content creators, and teams produce documents that are clearer,
+        more inclusive, and accessible to all readers — including people who use assistive technology.
 
-    **Our principles:**
-    - Accessibility checks should be *understandable*, not just flagged
-    - Plain-language explanations help writers learn, not just   fix
-    - AI suggestions should assist human judgment, not replace it
+        **Our principles:**
+        - Accessibility checks should be *understandable*, not just flagged
+        - Plain-language explanations help writers learn, not just   fix
+        - AI suggestions should assist human judgment, not replace it
 
-    **Technology stack:**
-    - [Streamlit](https://streamlit.io) — UI framework
-    - [textstat](https://github.com/textstat/textstat) — Readability metrics
-    - [pyspellchecker](https://github.com/barrust/pyspellchecker) — Spelling
-    - [Anthropic Claude](https://www.anthropic.com) — AI fix suggestions
+        **Technology stack:**
+        - [Streamlit](https://streamlit.io) — UI framework
+        - [textstat](https://github.com/textstat/textstat) — Readability metrics
+        - [pyspellchecker](https://github.com/barrust/pyspellchecker) — Spelling
+        - [Anthropic Claude](https://www.anthropic.com) — AI fix suggestions
 
-    **Standards alignment:**
-    - Reading level targets follow [Plain Language Guidelines](https://www.plainlanguage.gov/)
-    """)
+        **Standards alignment:**
+        - Reading level targets follow [Plain Language Guidelines](https://www.plainlanguage.gov/)
+        """)
