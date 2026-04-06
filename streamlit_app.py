@@ -15,7 +15,7 @@ from pathlib import Path
 import streamlit as st
 import textstat
 
-# ── Optional dependencies ─────────────────────────────────────────────────────
+# Optional dependencies
 # We wrap each import in a try/except so the app still runs even if a package
 # isn't installed. The HAS_* flags let us show friendly warnings instead of
 # crashing when a feature isn't available.
@@ -40,9 +40,7 @@ except Exception:
     HAS_PDF = False
 
 
-# ════════════════════════════════════════════════════════════════════════════════
 # PAGE CONFIG & STYLING
-# ════════════════════════════════════════════════════════════════════════════════
 
 st.set_page_config(
     page_title="WriteAble – Accessible Document Helper",
@@ -111,9 +109,7 @@ textarea, input[type="text"] { border: 1px solid #555 !important; }
 """, unsafe_allow_html=True)
 
 
-# ════════════════════════════════════════════════════════════════════════════════
 # DATA MODEL
-# ════════════════════════════════════════════════════════════════════════════════
 
 @dataclass
 class Issue:
@@ -138,9 +134,7 @@ class Issue:
     suggestion: str = ""
 
 
-# ════════════════════════════════════════════════════════════════════════════════
 # CHECKER ENGINE
-# ════════════════════════════════════════════════════════════════════════════════
 
 # Each tuple is (regex pattern, suggested replacement).
 # We use word-boundary anchors (\b) so "mankind" doesn't accidentally match
@@ -396,9 +390,7 @@ def run_checks(text: str) -> List[Issue]:
     return issues
 
 
-# ════════════════════════════════════════════════════════════════════════════════
 # FILE EXTRACTION
-# ════════════════════════════════════════════════════════════════════════════════
 
 def extract_text(f) -> Optional[str]:
     """
@@ -411,7 +403,7 @@ def extract_text(f) -> Optional[str]:
     name = f.name.lower()
     try:
         if name.endswith(".txt"):
-            # Plain text — just decode the bytes directly
+            # Plain text, just decode the bytes directly
             return f.read().decode("utf-8", errors="replace")
 
         if name.endswith(".docx"):
@@ -443,9 +435,7 @@ def extract_text(f) -> Optional[str]:
         return None
 
 
-# ════════════════════════════════════════════════════════════════════════════════
 # REPORT RENDERING
-# ════════════════════════════════════════════════════════════════════════════════
 
 # Emoji icons shown in tab headers and next to category badge text
 _CAT_ICON = {"Grammar": "📝", "Readability": "📖", "Accessibility": "♿"}
@@ -471,7 +461,7 @@ def render_issue(issue: Issue, tab_prefix: str = ""):
     if st.session_state.get(f"dis_{stk}"):
         return
 
-    # ── Colored header strip ─────────────────────────────────────────────────
+    # Colored header strip
     # We use raw HTML here because Streamlit's native components don't support
     # left-border coloring or inline badge pills.
     st.markdown(
@@ -483,7 +473,7 @@ def render_issue(issue: Issue, tab_prefix: str = ""):
         unsafe_allow_html=True
     )
 
-    # ── Expandable detail panel ───────────────────────────────────────────────
+    # Expandable detail panel
     with st.expander("Details & Fix", expanded=False):
 
         # Plain English explanation of why this is a problem
@@ -508,11 +498,11 @@ def render_issue(issue: Issue, tab_prefix: str = ""):
                 # Show the previously accepted fix; persists until re-analysis
                 st.success(f"Fix noted: _{accepted}_")
             else:
-                # AI fix placeholder — this caption will be replaced with the
+                # AI fix placeholder, this caption will be replaced with the
                 # "Get AI Fix" button when AI integration is added back.
                 st.caption("AI Fix coming soon — use the quick suggestion above for now.")
 
-        # ── Dismiss button ────────────────────────────────────────────────────
+        # Dismiss button
         # Sets a flag in session state. The issue disappears from all tabs on
         # the next rerun, and the 'Remaining' counter updates automatically.
         with col_dis:
@@ -531,12 +521,12 @@ def render_report(issues: List[Issue], text: str):
     document text (needed for the download button).
     """
 
-    # Happy path — no problems found
+    # Happy path, no problems found
     if not issues:
         st.success("No accessibility issues found! Your document looks great.")
         return
 
-    # ── Summary stat boxes ────────────────────────────────────────────────────
+    # Summary stat boxes
     # Count up each severity level and how many are still open vs dismissed
     errors    = sum(1 for i in issues if i.severity == "error")
     warnings  = sum(1 for i in issues if i.severity == "warning")
@@ -568,7 +558,7 @@ def render_report(issues: List[Issue], text: str):
 
     st.markdown("---")
 
-    # ── Filter panel ──────────────────────────────────────────────────────────
+    # Filter panel
     # Collapsed by default so it doesn't take up space unless the user needs it
     with st.expander("🔍 Filter issues", expanded=False):
         fc1, fc2, fc3 = st.columns(3)
@@ -604,7 +594,7 @@ def render_report(issues: List[Issue], text: str):
             )
         ]
 
-    # ── Tabbed issue list ─────────────────────────────────────────────────────
+    # Tabbed issue list
     # Each category gets its own tab so users can focus on one area at a time.
     # The 'All Issues' tab shows everything together for a full overview.
     #
@@ -646,7 +636,7 @@ def render_report(issues: List[Issue], text: str):
         for issue in filtered:
             render_issue(issue, tab_prefix="all_")
 
-    # ── Export ────────────────────────────────────────────────────────────────
+    # Export
     st.markdown("---")
     st.subheader("📥 Export")
     ec1, ec2 = st.columns(2)
@@ -680,9 +670,7 @@ def render_report(issues: List[Issue], text: str):
         )
 
 
-# ════════════════════════════════════════════════════════════════════════════════
 # SIDEBAR
-# ════════════════════════════════════════════════════════════════════════════════
 
 # Show the logo if it exists next to app.py, otherwise fall back to plain text
 logo_path = Path("logo.png")
@@ -712,13 +700,12 @@ st.sidebar.markdown(f"{'✅' if HAS_PDF else '⚠️'} PDF support "
                     f"({'ready' if HAS_PDF else 'pip install pdfplumber'})")
 
 
-# ════════════════════════════════════════════════════════════════════════════════
-# PAGES
-# ════════════════════════════════════════════════════════════════════════════════
+
+# MAIN
 
 if main_page == "Main App":
 
-    # ── Overview banner ───────────────────────────────────────────────────────
+    # Overview banner
     st.title("WriteAble – Accessible Document Helper")
     st.markdown(
         "WriteAble analyzes documents for **accessibility, readability, and grammar issues** "
@@ -732,7 +719,7 @@ if main_page == "Main App":
 
     st.markdown("---")
 
-    # ── Upload / paste section ────────────────────────────────────────────────
+    # Upload / paste section
     st.subheader("Step 1 : Upload or paste your document")
 
     col1, col2 = st.columns(2)
@@ -758,7 +745,7 @@ if main_page == "Main App":
 
     st.markdown("---")
 
-    # ── Run button ────────────────────────────────────────────────────────────
+    # Run button
     st.subheader("Step 2 : Run the accessibility check")
 
     if st.button("Run Accessibility Check", type="primary"):
@@ -811,11 +798,11 @@ if main_page == "Main App":
 
     st.markdown("---")
 
-    # ── Results section ───────────────────────────────────────────────────────
+    # Results section
     st.subheader("Step 3 : Review the interactive report")
 
     if "analysis_issues" not in st.session_state:
-        # Nothing has been analysed yet — show a gentle prompt
+        # Nothing has been analyzed yet — show a gentle prompt
         st.info("Run a check above to see results here.")
     else:
         issues = st.session_state["analysis_issues"]
@@ -833,7 +820,7 @@ if main_page == "Main App":
         render_report(issues, text)
 
 
-# ── Guides & About ────────────────────────────────────────────────────────────
+# Guides & About
 elif main_page == "Guides & About":
 
     tab1, tab2, tab3 = st.tabs(["⚡ Quick Guide", "📘 Full Guide", "ℹ️ About"])
