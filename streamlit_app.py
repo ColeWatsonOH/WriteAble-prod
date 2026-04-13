@@ -15,10 +15,6 @@ from pathlib import Path
 import streamlit as st
 import textstat
 
-from openai import OpenAI
-import json
-
-# ── Optional deps ─────────────────────────────────────────────────────────────
 # Optional dependencies
 # We wrap each import in a try/except so the app still runs even if a package
 # isn't installed. The HAS_* flags let us show friendly warnings instead of
@@ -44,12 +40,6 @@ except Exception:
     HAS_PDF = False
 
 
-# ════════════════════════════════════════════════════════════════════════════════
-# PAGE CONFIG & CSS
-# ════════════════════════════════════════════════════════════════════════════════
-# Set up Streamlit page settings
-st.set_page_config(page_title="WriteAble – Accessible Document Helper",
-                   page_icon="📝", layout="wide")
 # PAGE CONFIG & STYLING
 
 st.set_page_config(
@@ -145,8 +135,6 @@ class Issue:
 
 
 # CHECKER ENGINE
-# ════════════════════════════════════════════════════════════════════════════════
-# Define rules and regex patterns used in text analysis
 
 # Each tuple is (regex pattern, suggested replacement).
 # We use word-boundary anchors (\b) so "mankind" doesn't accidentally match
@@ -185,13 +173,12 @@ _PASSIVE_RE = re.compile(
 # Matches sequences of 2–7 uppercase letters (potential acronyms like WCAG, HR, PDF).
 _ACRONYM_RE = re.compile(r'\b([A-Z]{2,7})\b')
 
-# Helper function to count words in text
+
 def _word_count(text: str) -> int:
     """Count only real words, ignores punctuation and numbers."""
     return len(re.findall(r'\b[a-zA-Z]+\b', text))
 
 
-# Helper function to split text into sentences
 def _sentences(text: str) -> List[str]:
     """
     Split text into sentences on . ! ? boundaries.
@@ -199,11 +186,7 @@ def _sentences(text: str) -> List[str]:
     """
     return [s.strip() for s in re.split(r'(?<=[.!?])\s+', text) if s.strip()]
 
-# Handles page navigation using query parameters
-def go_to(page_name: str):
-    st.query_params["page"] = page_name
 
-# Main function that runs all accessibility and readability checks
 def run_checks(text: str) -> List[Issue]:
     """
     Master function that runs all 12 checks and returns a list of Issue objects.
@@ -217,19 +200,12 @@ def run_checks(text: str) -> List[Issue]:
     issues: List[Issue] = []
     _id = 0  # auto-incrementing issue ID
 
-    # Helper function to add issues to the list
     # Small helper so we don't repeat the Issue(...) constructor everywhere
     def add(cat, sev, title, expl, snip, sug=""):
         nonlocal _id
         _id += 1
         issues.append(Issue(_id, cat, sev, title, expl, snip, sug))
 
-    # Preprocess text into words, sentences, and counts
-    all_words = re.findall(r'\b[a-zA-Z]+\b', text)
-    sentences  = _sentences(text)
-    total_words = _word_count(text)
-
-    # Check for spelling errors using spellchecker
     # Pre-compute some useful slices of the text we'll reuse across checks
     all_words   = re.findall(r'\b[a-zA-Z]+\b', text)
     sentences   = _sentences(text)
@@ -250,7 +226,6 @@ def run_checks(text: str) -> List[Issue]:
                     f"Did you mean '{correction}'? Correct spelling improves professionalism and clarity.",
                     word, correction)
 
-    # Detect repeated words
     # Check 2: Repeated consecutive words
     # Catches typos like "the the" or "is is".
     for m in re.finditer(r'\b(\w+)\s+\1\b', text, re.IGNORECASE):
@@ -259,7 +234,6 @@ def run_checks(text: str) -> List[Issue]:
             "The same word appears twice in a row — this is likely a typo.",
             m.group())
 
-    # Detect extra spaces in the text
     # Check 3: Extra spaces
     # Two or more consecutive spaces can break layout and confuse screen readers.
     if re.search(r'  +', text):
@@ -269,7 +243,6 @@ def run_checks(text: str) -> List[Issue]:
             "Use a single space between words.",
             "Multiple consecutive spaces detected in the document")
 
-    # Check sentence length for readability issues
     # Check 4: Per-sentence length
     # Long sentences are hard to parse, especially for users with cognitive
     # disabilities or those reading via a screen reader at speed.
@@ -289,7 +262,6 @@ def run_checks(text: str) -> List[Issue]:
                 "including those using screen readers.",
                 snip)
 
-    # Calculate readability scores (Flesch and grade level)
     # Check 5: Flesch Reading Ease & Kincaid Grade
     # Flesch Reading Ease: 0–100 scale. Higher = easier. 60+ is the target for
     # general audiences. Below 30 is considered college-level or above.
@@ -317,7 +289,6 @@ def run_checks(text: str) -> List[Issue]:
                 "For broad audiences—including people with cognitive disabilities—target grade 8 or below.",
                 f"Flesch-Kincaid Grade Level: {fkgl:.1f}")
 
-    # Detect overuse of passive voice
     # Check 6: Passive voice overuse
     # A couple of passive sentences is fine; more than 4 in a document suggests
     # a habitual pattern that makes text harder to follow.
@@ -330,7 +301,6 @@ def run_checks(text: str) -> List[Issue]:
             "E.g., 'Errors were found by the team' → 'The team found errors'.",
             f"Examples: {examples}")
 
-    # Check for non-inclusive language patterns
     # Check 7: Inclusive language
     # Iterate over every rule in _INCLUSIVE_RULES and scan the full text.
     # For each match we grab ~50 characters of surrounding context so the
@@ -346,10 +316,6 @@ def run_checks(text: str) -> List[Issue]:
                 "respected and represented.",
                 ctx, suggestion)
 
-    # Detect excessive use of ALL CAPS text
-    defined_acr = set(re.findall(r'\(([A-Z]{2,7})\)', text))
-    all_caps    = re.findall(r'\b[A-Z]{4,}\b', text)
-    # Exclude defined acronyms
     # Check 8: Excessive ALL CAPS
     # ALL CAPS words that have been formally defined in parentheses (e.g. "HTML"
     # from "(HTML)") are excluded — we only flag undefined ones.
@@ -366,7 +332,6 @@ def run_checks(text: str) -> List[Issue]:
             "Screen readers may read each letter individually. Use it sparingly.",
             "Examples: " + ", ".join(unique_caps[:7]))
 
-    # Detect acronyms that are not defined
     # Check 9: Undefined acronyms
     # Any capitalized sequence that never appears in parentheses elsewhere in the
     # document is considered 'undefined'. We skip a small allow-list of universal
@@ -384,9 +349,6 @@ def run_checks(text: str) -> List[Issue]:
             "Screen reader users and non-specialist readers may not recognise them.",
             ", ".join(undefined[:8]))
 
-    # Check if long documents are missing headings
-    has_md_headings = bool(re.search(r'^#{1,6}\s+\w+', text, re.MULTILINE))
-    # Also detect plain-text heading style (line of text alone on a line, all caps or Title Case)
     # Check 10: Missing headings in long documents
     # We look for Markdown-style headings (# Heading) or plain-text headings
     # (a line that is Title Case or ALL CAPS on its own). If neither is found
@@ -402,7 +364,6 @@ def run_checks(text: str) -> List[Issue]:
             "In Markdown, use # Heading, ## Sub-heading, etc.",
             f"Document has {total_words} words with no headings detected")
 
-    # Detect large blocks of text without paragraph breaks
     # Check 11: Wall of text (no paragraph breaks)
     # A document that is one giant block of text is hard to scan for anyone,
     # and especially difficult for users with dyslexia or attention difficulties.
@@ -414,7 +375,6 @@ def run_checks(text: str) -> List[Issue]:
             "and accessibility.",
             f"Entire document is one paragraph ({total_words} words)")
 
-    # Detect raw URLs instead of descriptive links
     # Check 12: Bare URLs as link text
     # A raw URL like https://example.com/very/long/path is read character-by-
     # character by screen readers, which is tedious and confusing. Descriptive
@@ -427,41 +387,9 @@ def run_checks(text: str) -> List[Issue]:
             "descriptive link text like [Read our accessibility guide](https://…) in Markdown.",
             bare_urls[0][:80])
 
-    # Return all detected issues
     return issues
 
 
-# ════════════════════════════════════════════════════════════════════════════════
-# AI FIX
-# ════════════════════════════════════════════════════════════════════════════════
-def get_ai_fix_openai(issue: Issue, full_text: str) -> str:
-    prompt = f"""
-    You are an expert in accessibility, readability, and grammar.
-
-    Issue category: {issue.category}
-    Issue: {issue.title}
-    Explanation: {issue.explanation}
-    Problematic text: {issue.snippet}
-
-    Return JSON with:
-    - suggestions (list)
-    - each suggestion must include:
-        - label
-        - explanation
-        - updated_text
-
-    Only return valid JSON.
-    """
-
-    response = client.chat.completions.create(
-        model="gpt-4.1-mini",
-        messages=[{"role": "user", "content": prompt}]
-    )
-
-    return response.choices[0].message.content
-
-
-# ════════════════════════════════════════════════════════════════════════════════
 # FILE EXTRACTION
 
 def extract_text(f) -> Optional[str]:
@@ -474,11 +402,9 @@ def extract_text(f) -> Optional[str]:
     """
     name = f.name.lower()
     try:
-        # Handle plain text files
         if name.endswith(".txt"):
             # Plain text, just decode the bytes directly
             return f.read().decode("utf-8", errors="replace")
-        # Handle Word documents if library is installed
 
         if name.endswith(".docx"):
             if HAS_DOCX:
@@ -490,7 +416,6 @@ def extract_text(f) -> Optional[str]:
                 st.warning("python-docx not installed — cannot read .docx files. "
                            "Run: pip install python-docx")
                 return None
-        # Handle PDFs if library is installed
 
         if name.endswith(".pdf"):
             if HAS_PDF:
@@ -504,7 +429,6 @@ def extract_text(f) -> Optional[str]:
 
         # Last resort: try to decode as UTF-8 regardless of file extension
         return f.read().decode("utf-8", errors="replace")
-    # Catch and display any file reading errors
 
     except Exception as e:
         st.error(f"Could not read file: {e}")
@@ -512,16 +436,6 @@ def extract_text(f) -> Optional[str]:
 
 
 # REPORT RENDERING
-# ════════════════════════════════════════════════════════════════════════════════
-# Define colors and icons used when rendering issues in the interface
-_SEV_COLOR = {"error": "#C62828",  "warning": "#E65100", "info": "#1565C0"}
-_BG_COLOR  = {"error": "#fff5f5",  "warning": "#fffbf0", "info": "#f0f6ff"}
-_CAT_ICON  = {"Grammar": "📝",     "Readability": "📖",  "Accessibility": "♿"}
-
-# Render a single issue card in the UI with details and actions
-def render_issue(issue: Issue, full_text: str, api_key: Optional[str], tab_prefix: str = ""):
-    # wk  = widget key  (must be unique across ALL tabs rendered simultaneously)
-    # stk = state key   (shared across tabs so accept/dismiss is consistent everywhere)
 
 # Emoji icons shown in tab headers and next to category badge text
 _CAT_ICON = {"Grammar": "📝", "Readability": "📖", "Accessibility": "♿"}
@@ -547,7 +461,6 @@ def render_issue(issue: Issue, tab_prefix: str = ""):
     if st.session_state.get(f"dis_{stk}"):
         return
 
-    # Display issue header (severity, category, title)
     # Colored header strip
     # We use raw HTML here because Streamlit's native components don't support
     # left-border coloring or inline badge pills.
@@ -559,8 +472,6 @@ def render_issue(issue: Issue, tab_prefix: str = ""):
         f'</div>',
         unsafe_allow_html=True
     )
-    
-    # Expandable section for full details and fixes
 
     # Expandable detail panel
     with st.expander("Details & Fix", expanded=False):
@@ -574,55 +485,15 @@ def render_issue(issue: Issue, tab_prefix: str = ""):
             unsafe_allow_html=True
         )
 
-        # Show quick suggestion if available
         # If a quick (non-AI) suggestion exists, show it as a blue info box
         if issue.suggestion:
             st.info(f"💡 Quick suggestion: **{issue.suggestion}**")
 
-        # Layout for fix and dismiss buttons
         col_fix, col_dis = st.columns([3, 1])
+
         with col_fix:
             # Check whether a fix has already been accepted for this issue
             accepted = st.session_state.get(f"acc_{stk}")
-            ai_fix   = st.session_state.get(f"fix_{stk}")
-
-            # If user already accepted a fix
-            if accepted:
-                st.success(f"✅ Fix accepted: _{accepted}_")
-            # If AI fix exists but not accepted yet
-            elif ai_fix:
-                st.markdown('<div class="fix-box">🤖 <b>AI suggestion:</b></div>', unsafe_allow_html=True)
-
-                try:
-                    parsed = json.loads(ai_fix)
-
-                    for sug in parsed["suggestions"]:
-                        st.markdown(f"**Fix:** {sug['label']}")
-                        st.markdown(f"_{sug['explanation']}_")
-                        st.code(sug["updated_text"])
-
-                except:
-                    st.write(ai_fix)
-                # Button to accept AI fix
-                if st.button("✅ Accept this fix", key=f"acc_btn_{wk}"):
-                    st.session_state[f"acc_{stk}"] = ai_fix
-                    st.rerun()
-            # If no AI fix yet, allow generating one
-            else:
-                if st.button("🤖 Get AI Fix", key=f"ai_btn_{wk}"):
-                    with st.spinner("Generating AI fix…"):
-                        raw = get_ai_fix_openai(issue, full_text)
-
-                        try:
-                            parsed = json.loads(raw)
-                            suggestion = parsed["suggestions"][0]["updated_text"]
-                        except:
-                            suggestion = raw  # fallback
-
-                        st.session_state[f"fix_{stk}"] = suggestion
-                        st.rerun()
-
-        # Dismiss button section
             if accepted:
                 # Show the previously accepted fix; persists until re-analysis
                 st.success(f"Fix noted: _{accepted}_")
@@ -640,11 +511,6 @@ def render_issue(issue: Issue, tab_prefix: str = ""):
                     st.session_state[f"dis_{stk}"] = True
                     st.rerun()
 
-# Render the full report
-def render_report(issues: List[Issue], text: str, api_key: Optional[str]):
-    """Full interactive report with summary, filters, tabs, and export."""
-
-    # If no issues found, show success message
 
 def render_report(issues: List[Issue], text: str):
     """
@@ -660,12 +526,6 @@ def render_report(issues: List[Issue], text: str):
         st.success("No accessibility issues found! Your document looks great.")
         return
 
-    # Calculate summary statistics
-    errors   = sum(1 for i in issues if i.severity == "error")
-    warnings = sum(1 for i in issues if i.severity == "warning")
-    infos    = sum(1 for i in issues if i.severity == "info")
-    active   = sum(1 for i in issues if not st.session_state.get(f"dis_{i.id}"))
-    accepted = sum(1 for i in issues if st.session_state.get(f"acc_{i.id}"))
     # Summary stat boxes
     # Count up each severity level and how many are still open vs dismissed
     errors    = sum(1 for i in issues if i.severity == "error")
@@ -674,7 +534,6 @@ def render_report(issues: List[Issue], text: str):
     accepted  = sum(1 for i in issues if st.session_state.get(f"acc_{i.id}"))
     remaining = sum(1 for i in issues if not st.session_state.get(f"dis_{i.id}"))
 
-    # Display summary metrics in columns
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.markdown(
         f'<div class="stat-box" style="background:#fff5f5;color:#C62828">'
@@ -703,7 +562,6 @@ def render_report(issues: List[Issue], text: str):
     # Collapsed by default so it doesn't take up space unless the user needs it
     with st.expander("🔍 Filter issues", expanded=False):
         fc1, fc2, fc3 = st.columns(3)
-        # Filter by category
         with fc1:
             show_cats = st.multiselect(
                 "Category",
@@ -711,7 +569,6 @@ def render_report(issues: List[Issue], text: str):
                 default=["Grammar", "Readability", "Accessibility"],
                 key="filter_cat"
             )
-        # Filter by severity level
         with fc2:
             show_sevs = st.multiselect(
                 "Severity",
@@ -719,11 +576,9 @@ def render_report(issues: List[Issue], text: str):
                 default=["error", "warning", "info"],
                 key="filter_sev"
             )
-        # Search box for keyword filtering
         with fc3:
             search_q = st.text_input("Search", placeholder="Filter by keyword…", key="filter_q")
 
-    # Apply all selected filters to the issue list
     def apply_filters(issue_list):
         """Return only issues that pass the current category, severity, and search filters."""
         return [
@@ -739,7 +594,6 @@ def render_report(issues: List[Issue], text: str):
             )
         ]
 
-    # Create tabs to organize issues by category
     # Tabbed issue list
     # Each category gets its own tab so users can focus on one area at a time.
     # The 'All Issues' tab shows everything together for a full overview.
@@ -750,7 +604,6 @@ def render_report(issues: List[Issue], text: str):
         ["📝 Grammar", "📖 Readability", "♿ Accessibility", "🔍 All Issues"]
     )
 
-    # Display grammar issues
     with tab_grammar:
         filtered = apply_filters([i for i in issues if i.category == "Grammar"])
         st.markdown(f"**{len(filtered)} issue(s)**")
@@ -759,7 +612,6 @@ def render_report(issues: List[Issue], text: str):
         for issue in filtered:
             render_issue(issue, tab_prefix="g_")
 
-    # Display readability issues
     with tab_read:
         filtered = apply_filters([i for i in issues if i.category == "Readability"])
         st.markdown(f"**{len(filtered)} issue(s)**")
@@ -768,7 +620,6 @@ def render_report(issues: List[Issue], text: str):
         for issue in filtered:
             render_issue(issue, tab_prefix="r_")
 
-    # Display accessibility issues
     with tab_access:
         filtered = apply_filters([i for i in issues if i.category == "Accessibility"])
         st.markdown(f"**{len(filtered)} issue(s)**")
@@ -777,7 +628,6 @@ def render_report(issues: List[Issue], text: str):
         for issue in filtered:
             render_issue(issue, tab_prefix="a_")
 
-    # Display all issues together
     with tab_all:
         filtered = apply_filters(issues)
         st.markdown(f"**{len(filtered)} issue(s) shown**")
@@ -786,13 +636,11 @@ def render_report(issues: List[Issue], text: str):
         for issue in filtered:
             render_issue(issue, tab_prefix="all_")
 
-    # Export section for downloading results
     # Export
     st.markdown("---")
     st.subheader("📥 Export")
     ec1, ec2 = st.columns(2)
 
-    # Download original text
     with ec1:
         # Always available — re-encodes the original document text as UTF-8 bytes
         st.download_button(
@@ -803,28 +651,6 @@ def render_report(issues: List[Issue], text: str):
         )
 
     with ec2:
-        # Build a fixes summary report
-        accepted_issues = [(i, st.session_state.get(f"acc_{i.id}"))
-                           for i in issues if st.session_state.get(f"acc_{i.id}")]
-        if accepted_issues:
-            report_lines = ["WRITEABLE – ACCEPTED FIXES REPORT", "=" * 45, ""]
-            # Build report content line-by-line
-            for iss, fix in accepted_issues:
-                report_lines += [
-                    f"[{iss.category.upper()} / {iss.severity.upper()}]",
-                    f"Issue   : {iss.title}",
-                    f"Original: {iss.snippet}",
-                    f"Fix     : {fix}",
-                    ""
-                ]
-            st.download_button(
-                "⬇ Download fixes report (.txt)",
-                data="\n".join(report_lines).encode("utf-8"),
-                file_name="fixes_report.txt",
-                mime="text/plain"
-            )
-        else:
-            st.caption("Accept at least one AI fix to download a fixes report.")
         # Build a plain-text summary of every issue (dismissed ones are labelled)
         report_lines = ["WRITEABLE – ISSUES REPORT", "=" * 45, ""]
         for iss in issues:
@@ -845,18 +671,14 @@ def render_report(issues: List[Issue], text: str):
 
 
 # SIDEBAR
-# ════════════════════════════════════════════════════════════════════════════════
-# Display sidebar with navigation, settings, and system status
 
 # Show the logo if it exists next to app.py, otherwise fall back to plain text
 logo_path = Path("logo.png")
-# Show logo if it exists, otherwise show text title
 if logo_path.exists():
     st.sidebar.image(str(logo_path), width="stretch")
 else:
     st.sidebar.markdown("## 📝 WriteAble")
 
-# Navigation section for switching between pages
 st.sidebar.markdown("---")
 st.sidebar.markdown("## Navigation")
 
@@ -867,23 +689,6 @@ main_page = st.sidebar.radio(
     label_visibility="collapsed"
 )
 
-# Update URL query params based on selected page
-if main_page == "Main App":
-    st.query_params["page"] = "main"
-else:
-    st.query_params["page"] = "guides"
-
-# Input field for API key used in AI fixes
-st.sidebar.markdown("---")
-st.sidebar.markdown("## 🤖 AI Fix Settings")
-api_key = st.sidebar.text_input(
-    "Anthropic API Key",
-    type="password",
-    help="Needed for AI Fix suggestions. Your key is never stored.",
-    placeholder="sk-ant-…"
-) or None
-
-# Status indicators for feautures
 # Quick at-a-glance status so users can see which optional features are active
 st.sidebar.markdown("---")
 st.sidebar.markdown("**Package status**")
@@ -895,10 +700,6 @@ st.sidebar.markdown(f"{'✅' if HAS_PDF else '⚠️'} PDF support "
                     f"({'ready' if HAS_PDF else 'pip install pdfplumber'})")
 
 
-# ════════════════════════════════════════════════════════════════════════════════
-# PAGES
-# ════════════════════════════════════════════════════════════════════════════════
-# Main App Functionality
 
 # MAIN
 
@@ -911,47 +712,6 @@ if main_page == "Main App":
         "and provides plain-language explanations for every problem it finds."
     )
 
-    # Overview section
-        st.title("WriteAble – Accessible Document Helper")
-        st.markdown("""
-        WriteAble analyzes documents for **accessibility, readability, and grammar issues**
-        and provides plain-language explanations and AI-powered fix suggestions.
-        """)
-
-        # Display quick stats at top
-        col_a, col_b, col_c = st.columns(3)
-        col_a.metric("Check types", "12", "Grammar, Readability, Accessibility")
-        col_b.metric("Max file size", "20 MB", "PDF, DOCX, TXT")
-        col_c.metric("AI fix model", "Claude Haiku", "Fast & accurate")
-
-        st.markdown("---")
-        
-    # Upload section
-        st.title("Upload or Paste Your Document")
-
-        col1, col2 = st.columns(2)
-
-        # File upload input
-        with col1:
-            st.subheader("📁 Upload a file")
-            uploaded = st.file_uploader(
-                "Choose a file (TXT, DOCX, or PDF)",
-                type=["txt", "docx", "pdf"],
-                help="Files are processed locally and never stored."
-            )
-            # Show file info if updated
-            if uploaded:
-                st.info(f"File loaded: **{uploaded.name}** ({uploaded.size / 1024:.1f} KB)")
-        
-        # Text paste input
-        with col2:
-            st.subheader("✏ Paste text")
-            pasted = st.text_area(
-                "Paste your document text here:",
-                height=220,
-                placeholder="Paste any document text here…",
-                help="Paste plain text, Markdown, or any document copy."
-            )
     col_a, col_b, col_c = st.columns(3)
     col_a.metric("Check types", "12", "Grammar, Readability, Accessibility")
     col_b.metric("Max file size", "200 MB", "PDF, DOCX, TXT")
@@ -964,86 +724,6 @@ if main_page == "Main App":
 
     col1, col2 = st.columns(2)
 
-        # Run analysis button
-        if st.button("🔍 Run Accessibility Check", type="primary"):
-            # Determine text source
-            text = None
-            source_label = ""
-
-            if uploaded:
-                # Extract text from uploaded file
-                with st.spinner("Reading file…"):
-                    text = extract_text(uploaded)
-                    source_label = uploaded.name
-            elif pasted and pasted.strip():
-                # Use pasted text
-                text = pasted.strip()
-                source_label = "pasted text"
-            else:
-                # No input provided
-                st.warning("Please upload a file or paste some text first.")
-
-            # Validate and analyze text
-            if text and text.strip():
-                if len(text.strip()) < 20:
-                    # Prevent analyzing very short text
-                    st.warning("Text is too short to analyze (need at least 20 characters).")
-                else:
-                    # Run main checker
-                    with st.spinner("Running accessibility checks…"):
-                        issues = run_checks(text)
-
-                    # Store in session state
-                    st.session_state["analysis_text"]   = text
-                    st.session_state["analysis_issues"]  = issues
-                    st.session_state["analysis_source"]  = source_label
-                    # Clear previous fix state
-                    for key in [k for k in st.session_state if k.startswith(("fix_", "acc_", "dis_"))]:
-                        del st.session_state[key]
-
-                    # Show success message
-                    st.success(f"✅ Analysis complete: **{len(issues)} issue(s)** found in {source_label}")
-
-                    # Show quick summary stats
-                    errors   = sum(1 for i in issues if i.severity == "error")
-                    warnings = sum(1 for i in issues if i.severity == "warning")
-                    infos    = sum(1 for i in issues if i.severity == "info")
-                    pc1, pc2, pc3 = st.columns(3)
-                    pc1.metric("🔴 Errors",     errors)
-                    pc2.metric("🟡 Warnings",   warnings)
-                    pc3.metric("🔵 Suggestions", infos)
-
-                    
-        st.markdown("---")
-        # Results section
-        st.title("Analysis Results")
-
-        # If no analysis has been run yet
-        if "analysis_issues" not in st.session_state:
-            st.info("No analysis has been run yet. Go to **Upload & Analyze** first.")
-        else:
-            # Load stored results
-            issues = st.session_state["analysis_issues"]
-            text   = st.session_state["analysis_text"]
-            source = st.session_state.get("analysis_source", "document")
-
-            # Show document info
-            st.markdown(f"**Source:** {source} &nbsp;|&nbsp; **{len(text.split())} words** &nbsp;|&nbsp; **{len(issues)} issue(s) found**")
-            st.markdown("---")
-
-            # Render full interactive report
-            render_report(issues, text, api_key)
-
-
-# Guides and About Pages
-elif main_page == "Guides & About":
-
-    # Create tabs for guide sections
-    tab1, tab2, tab3 = st.tabs([
-        "⚡ Quick Guide",
-        "📘 Full Guide",
-        "ℹ️ About"
-    ])
     with col1:
         st.markdown("**Upload a file**")
         uploaded = st.file_uploader(
@@ -1145,7 +825,6 @@ elif main_page == "Guides & About":
 
     tab1, tab2, tab3 = st.tabs(["⚡ Quick Guide", "📘 Full Guide", "ℹ️ About"])
 
-    # Quick guide tab with simple instructions
     with tab1:
         st.title("Quick User Guide")
         st.markdown("""
@@ -1177,7 +856,6 @@ elif main_page == "Guides & About":
         issues report as a `.txt` file.
         """)
 
-    # Full guide tab with detailed documentation
     with tab2:
         st.title("Full User Guide")
         st.markdown("""
@@ -1234,7 +912,6 @@ elif main_page == "Guides & About":
         - No animations, auto-play media, or flashing content
         """)
 
-    # About tab with project information
     with tab3:
         st.title("About WriteAble")
         st.markdown("""
