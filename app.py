@@ -189,8 +189,7 @@ def _sentences(text: str) -> List[str]:
 
 def run_checks(text: str) -> List[Issue]:
     """
-    Master function that runs all 12 checks and returns a list of Issue objects.
-
+    function that runs all 12 checks and returns a list of Issue objects.
     Checks are grouped roughly as:
         1–3   Grammar      (spelling, repeated words, extra spaces)
         4–6   Readability  (sentence length, Flesch scores, passive voice)
