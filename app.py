@@ -916,7 +916,7 @@ elif main_page == "Guides & About":
         st.markdown("""
         WriteAble helps writers, content creators, and teams produce documents that are clearer,
         more inclusive, and accessible to all readers — including people who use assistive
-        technology such as screen readers.
+        technology such as screen readers. Built during the University of Mount Union's Spring 2026 CSC 492 course.
 
         **Our principles:**
         - Accessibility checks should be *understandable*, not just flagged
@@ -932,4 +932,10 @@ elif main_page == "Guides & About":
         - Inclusive language rules align with disability-first language guidance
         - Reading level targets follow [Plain Language Guidelines](https://www.plainlanguage.gov/)
         - Structural checks are informed by [WCAG 2.1](https://www.w3.org/TR/WCAG21/)
+        
+        **Our Team**
+        - Cole Watson (Team Leader)
+        - Xander George (Lead Tester)
+        - Hailea Reynolds (Configuration Manager)
+        - Julie Phillips (Architect)
         """)
