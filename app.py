@@ -933,7 +933,7 @@ elif main_page == "Guides & About":
         - Reading level targets follow [Plain Language Guidelines](https://www.plainlanguage.gov/)
         - Structural checks are informed by [WCAG 2.1](https://www.w3.org/TR/WCAG21/)
         
-        **Our Team**
+        **Our Team:**
         - Cole Watson (Team Leader)
         - Xander George (Lead Tester)
         - Hailea Reynolds (Configuration Manager)
